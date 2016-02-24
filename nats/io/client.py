@@ -11,17 +11,17 @@ import tornado.gen
 import tornado.ioloop
 
 from random import shuffle
-from urlparse import urlparse
+from urllib.parse import urlparse
 from datetime import timedelta
 from nats.io.errors import *
 from nats.io.utils  import *
 from nats.protocol.parser import *
 
-__version__  = b'0.2.2'
-__lang__     = b'python2'
+__version__  = '0.2.2'
+__lang__     = 'python3'
 _CRLF_       = b'\r\n'
 _SPC_        = b' '
-_EMPTY_      = b''
+_EMPTY_      = ''
 
 # Defaults
 DEFAULT_PING_INTERVAL     = 120 * 1000 # in ms
@@ -36,12 +36,12 @@ DEFAULT_READ_CHUNK_SIZE   = 32768 * 2
 DEFAULT_PENDING_SIZE      = 1024 * 1024
 DEFAULT_MAX_PAYLOAD_SIZE  = 1048576
 
-CONNECT_PROTO = b'{0} {1}{2}'
-PING_PROTO    = b'{0}{1}'.format(PING_OP, _CRLF_)
-PONG_PROTO    = b'{0}{1}'.format(PONG_OP, _CRLF_)
-PUB_PROTO     = b'{0} {1} {2} {3} {4}{5}{6}'
-SUB_PROTO     = b'{0} {1} {2} {3}{4}'
-UNSUB_PROTO   = b'{0} {1} {2}{3}'
+CONNECT_PROTO = b'%b %b%b'
+PING_PROTO    = b'%b%b' % (PING_OP, _CRLF_)
+PONG_PROTO    = b'%b%b' % (PONG_OP, _CRLF_)
+PUB_PROTO     = b'%b %b %b %b %b%b%b'
+SUB_PROTO     = b'%b %b %b %b%b'
+UNSUB_PROTO   = b'%b %b %b%b'
 
 class Client(object):
 
@@ -236,8 +236,8 @@ class Client(object):
     if self.options["name"] is not None:
       options["name"] = self.options["name"]
 
-    args = json.dumps(options, sort_keys=True)
-    return CONNECT_PROTO.format(CONNECT_OP, args, _CRLF_)
+    args = str.encode(json.dumps(options, sort_keys=True))
+    return CONNECT_PROTO % (CONNECT_OP, args, _CRLF_)
 
   @tornado.gen.coroutine
   def send_command(self, cmd, priority=False):
@@ -256,7 +256,7 @@ class Client(object):
       self._pending = b''
 
   def _publish(self, subject, reply, payload, payload_size):
-    pub_cmd = PUB_PROTO.format(PUB_OP, subject, reply, payload_size, _CRLF_, payload, _CRLF_)
+    pub_cmd = PUB_PROTO % (PUB_OP, str.encode(subject), str.encode(reply), str(payload_size).encode(), _CRLF_, str.encode(payload), _CRLF_)
     self.stats['out_msgs']  += 1
     self.stats['out_bytes'] += payload_size
     self.send_command(pub_cmd)
@@ -396,7 +396,7 @@ class Client(object):
     """
     Generates a SUB command given a Subscription and the subject sequence id.
     """
-    sub_cmd = SUB_PROTO.format(SUB_OP, sub.subject, sub.queue, ssid, _CRLF_)
+    sub_cmd = SUB_PROTO % (SUB_OP, str.encode(sub.subject), str.encode(sub.queue), str(ssid).encode(), _CRLF_)
     self.send_command(sub_cmd)
 
   @tornado.gen.coroutine
@@ -406,7 +406,7 @@ class Client(object):
     blocks in order to be able to define request/response semantics via pub/sub
     by announcing the server limited interest a priori.
     """
-    unsub_cmd = UNSUB_PROTO.format(UNSUB_OP, sid, limit, _CRLF_)
+    unsub_cmd = UNSUB_PROTO % (UNSUB_OP, str(sid).encode(), str(limit).encode(), _CRLF_)
     self.send_command(unsub_cmd)
 
   def _process_ping(self):

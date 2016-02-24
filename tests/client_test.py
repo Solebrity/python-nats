@@ -48,7 +48,7 @@ class Gnatsd(object):
                self.debug = True
 
      def start(self):
-          cmd = ["gnatsd", "-p", "%d" % self.port, "-m", "%d" % self.http_port]
+          cmd = ["/root/gnatsd/gnatsd", "-p", "%d" % self.port, "-m", "%d" % self.http_port]
 
           if self.user != "":
                cmd.append("--user")
@@ -107,7 +107,7 @@ class ClientUtilsTest(unittest.TestCase):
           nc.options["auth_required"] = False
           nc.options["name"] = None
           got = nc.connect_command()
-          expected = 'CONNECT {"lang": "python2", "pedantic": false, "verbose": false, "version": "%s"}\r\n' % __version__
+          expected = b'CONNECT {"lang": "python3", "pedantic": false, "verbose": false, "version": "%b"}\r\n' % __version__.encode()
           self.assertEqual(expected, got)
 
      def test_default_connect_command_with_name(self):
@@ -117,7 +117,7 @@ class ClientUtilsTest(unittest.TestCase):
           nc.options["auth_required"] = False
           nc.options["name"] = "secret"
           got = nc.connect_command()
-          expected = 'CONNECT {"lang": "python2", "name": "secret", "pedantic": false, "verbose": false, "version": "%s"}\r\n' % __version__
+          expected = b'CONNECT {"lang": "python3", "name": "secret", "pedantic": false, "verbose": false, "version": "%b"}\r\n' % __version__.encode()
           self.assertEqual(expected, got)
 
      def tests_generate_new_inbox(self):
@@ -176,7 +176,7 @@ class ClientTest(tornado.testing.AsyncTestCase):
           self.assertTrue(len(info_keys) > 0)
 
           got = nc.connect_command()
-          expected = 'CONNECT {"lang": "python2", "pedantic": false, "verbose": true, "version": "%s"}\r\n' % __version__
+          expected = b'CONNECT {"lang": "python3", "pedantic": false, "verbose": true, "version": "%b"}\r\n' % __version__.encode()
           self.assertEqual(expected, got)
 
      @tornado.testing.gen_test
@@ -188,7 +188,7 @@ class ClientTest(tornado.testing.AsyncTestCase):
           self.assertTrue(len(info_keys) > 0)
 
           got = nc.connect_command()
-          expected = 'CONNECT {"lang": "python2", "pedantic": true, "verbose": false, "version": "%s"}\r\n' % __version__
+          expected = b'CONNECT {"lang": "python3", "pedantic": true, "verbose": false, "version": "%b"}\r\n' % __version__.encode()
           self.assertEqual(expected, got)
 
      @tornado.testing.gen_test
@@ -233,8 +233,8 @@ class ClientTest(tornado.testing.AsyncTestCase):
                     "io_loop": self.io_loop
                     }
                yield client.nc.connect(**options)
-
-          self.assertEqual(socket.error, type(client.nc.last_error()))
+          print(client.nc.last_error())
+          self.assertEqual(ConnectionRefusedError, type(client.nc.last_error().real_error))
 
      @tornado.testing.gen_test
      def test_subscribe(self):
@@ -254,7 +254,7 @@ class ClientTest(tornado.testing.AsyncTestCase):
 
           http = tornado.httpclient.AsyncHTTPClient()
           response = yield http.fetch('http://127.0.0.1:%d/connz' % self.server_pool[0].http_port)
-          result = json.loads(response.body)
+          result = json.loads(response.body.decode("utf-8"))
           connz = result['connections'][0]
           self.assertEqual(2, connz['subscriptions'])
 
@@ -274,14 +274,14 @@ class ClientTest(tornado.testing.AsyncTestCase):
 
           http = tornado.httpclient.AsyncHTTPClient()
           response = yield http.fetch('http://127.0.0.1:%d/varz' % self.server_pool[0].http_port)
-          varz = json.loads(response.body)
+          varz = json.loads(response.body.decode("utf-8"))
           self.assertEqual(10, varz['in_bytes'])
           self.assertEqual(10, varz['out_bytes'])
           self.assertEqual(2, varz['in_msgs'])
           self.assertEqual(2, varz['out_msgs'])
           self.assertEqual(2, len(log.records.keys()))
-          self.assertEqual("hello", log.records['one'][0].data)
-          self.assertEqual("world", log.records['two'][0].data)
+          self.assertEqual("hello", log.records[b'one'][0].data.decode())
+          self.assertEqual("world", log.records[b'two'][0].data.decode())
           self.assertEqual(10, nc.stats['in_bytes'])
           self.assertEqual(10, nc.stats['out_bytes'])
           self.assertEqual(2, nc.stats['in_msgs'])
@@ -302,9 +302,9 @@ class ClientTest(tornado.testing.AsyncTestCase):
 
                @tornado.gen.coroutine
                def respond(self, msg=None):
-                    yield self.nc.publish(msg.reply, "ok:1")
-                    yield self.nc.publish(msg.reply, "ok:2")
-                    yield self.nc.publish(msg.reply, "ok:3")
+                    yield self.nc.publish(msg.reply.decode(), "ok:1")
+                    yield self.nc.publish(msg.reply.decode(), "ok:2")
+                    yield self.nc.publish(msg.reply.decode(), "ok:3")
 
           log = Log()
           c = Component(nc)
@@ -315,13 +315,13 @@ class ClientTest(tornado.testing.AsyncTestCase):
 
           http = tornado.httpclient.AsyncHTTPClient()
           response = yield http.fetch('http://127.0.0.1:%d/varz' % self.server_pool[0].http_port)
-          varz = json.loads(response.body)
+          varz = json.loads(response.body.decode("utf-8"))
           self.assertEqual(18, varz['in_bytes'])
           self.assertEqual(32, varz['out_bytes'])
           self.assertEqual(4, varz['in_msgs'])
           self.assertEqual(7, varz['out_msgs'])
           self.assertEqual(2, len(log.records.keys()))
-          self.assertEqual("please", log.records['help'][0].data)
+          self.assertEqual("please", log.records[b'help'][0].data.decode())
           self.assertEqual(2, len(c.replies))
           self.assertEqual(32, nc.stats['in_bytes'])
           self.assertEqual(18, nc.stats['out_bytes'])
@@ -329,12 +329,12 @@ class ClientTest(tornado.testing.AsyncTestCase):
           self.assertEqual(4, nc.stats['out_msgs'])
 
           full_msg = ''
-          for msg in log.records['help']:
-               full_msg += msg.data
+          for msg in log.records[b'help']:
+               full_msg += msg.data.decode("utf-8")
 
           self.assertEqual('please', full_msg)
-          self.assertEqual("ok:1", c.replies[0].data)
-          self.assertEqual("ok:2", c.replies[1].data)
+          self.assertEqual("ok:1", c.replies[0].data.decode())
+          self.assertEqual("ok:2", c.replies[1].data.decode())
 
      @tornado.testing.gen_test
      def test_timed_request(self):
@@ -347,9 +347,9 @@ class ClientTest(tornado.testing.AsyncTestCase):
 
                @tornado.gen.coroutine
                def respond(self, msg=None):
-                    yield self.nc.publish(msg.reply, "ok:1")
-                    yield self.nc.publish(msg.reply, "ok:2")
-                    yield self.nc.publish(msg.reply, "ok:3")
+                    yield self.nc.publish(msg.reply.decode(), "ok:1")
+                    yield self.nc.publish(msg.reply.decode(), "ok:2")
+                    yield self.nc.publish(msg.reply.decode(), "ok:3")
 
           log = Log()
           c = Component(nc)
@@ -357,25 +357,25 @@ class ClientTest(tornado.testing.AsyncTestCase):
           yield nc.subscribe("help", "", c.respond)
 
           reply = yield nc.timed_request("help", "please")
-          self.assertEqual("ok:1", reply.data)
+          self.assertEqual("ok:1", reply.data.decode())
 
           http = tornado.httpclient.AsyncHTTPClient()
           response = yield http.fetch('http://127.0.0.1:%d/varz' % self.server_pool[0].http_port)
-          varz = json.loads(response.body)
+          varz = json.loads(response.body.decode("utf-8"))
           self.assertEqual(18, varz['in_bytes'])
           self.assertEqual(28, varz['out_bytes'])
           self.assertEqual(4, varz['in_msgs'])
           self.assertEqual(6, varz['out_msgs'])
           self.assertEqual(2, len(log.records.keys()))
-          self.assertEqual("please", log.records['help'][0].data)
+          self.assertEqual("please", log.records[b'help'][0].data.decode())
           self.assertEqual(28, nc.stats['in_bytes'])
           self.assertEqual(18, nc.stats['out_bytes'])
           self.assertEqual(6, nc.stats['in_msgs'])
           self.assertEqual(4, nc.stats['out_msgs'])
 
           full_msg = ''
-          for msg in log.records['help']:
-               full_msg += msg.data
+          for msg in log.records[b'help']:
+               full_msg += msg.data.decode("utf-8")
           self.assertEqual('please', full_msg)
 
      @tornado.testing.gen_test
@@ -405,7 +405,7 @@ class ClientTest(tornado.testing.AsyncTestCase):
 
           http = tornado.httpclient.AsyncHTTPClient()
           response = yield http.fetch('http://127.0.0.1:%d/varz' % self.server_pool[0].http_port)
-          varz = json.loads(response.body)
+          varz = json.loads(response.body.decode("utf-8"))
 
           self.assertEqual(10, varz['in_bytes'])
           self.assertEqual(0,  varz['out_bytes'])
@@ -598,7 +598,7 @@ class ClientAuthTest(tornado.testing.AsyncTestCase):
 
           http = tornado.httpclient.AsyncHTTPClient()
           response = yield http.fetch('http://127.0.0.1:8223/connz')
-          result = json.loads(response.body)
+          result = json.loads(response.body.decode("utf-8"))
           connz = result['connections'][0]
           self.assertEqual(3, connz['subscriptions'])
           self.assertEqual(1, connz['in_msgs'])
@@ -607,7 +607,7 @@ class ClientAuthTest(tornado.testing.AsyncTestCase):
           yield nc.publish("foo", "world")
           yield tornado.gen.sleep(0.5)
           response = yield http.fetch('http://127.0.0.1:8223/connz')
-          result = json.loads(response.body)
+          result = json.loads(response.body.decode("utf-8"))
           connz = result['connections'][0]
           self.assertEqual(3, connz['subscriptions'])
           self.assertEqual(2, connz['in_msgs'])
@@ -629,7 +629,7 @@ class ClientAuthTest(tornado.testing.AsyncTestCase):
 
           http = tornado.httpclient.AsyncHTTPClient()
           response = yield http.fetch('http://127.0.0.1:8224/connz')
-          result = json.loads(response.body)
+          result = json.loads(response.body.decode("utf-8"))
           connz = result['connections'][0]
           self.assertEqual(3, connz['subscriptions'])
           self.assertEqual(0, connz['in_msgs'])
@@ -638,15 +638,15 @@ class ClientAuthTest(tornado.testing.AsyncTestCase):
           yield nc.publish("foo", "!!!")
           yield tornado.gen.sleep(0.5)
           response = yield http.fetch('http://127.0.0.1:8224/connz')
-          result = json.loads(response.body)
+          result = json.loads(response.body.decode("utf-8"))
           connz = result['connections'][0]
           self.assertEqual(3, connz['subscriptions'])
           self.assertEqual(1, connz['in_msgs'])
           self.assertEqual(3, connz['in_bytes'])
 
           full_msg = ''
-          for msg in log.records['foo']:
-               full_msg += msg.data
+          for msg in log.records[b'foo']:
+               full_msg += msg.data.decode("utf-8")
 
           self.assertEqual('helloworld!!!', full_msg)
 
@@ -702,12 +702,12 @@ class ClientAuthTest(tornado.testing.AsyncTestCase):
           self.assertEqual(sid_3, 3)
           yield nc.publish("foo", "hello")
           yield tornado.gen.sleep(1)
-          self.assertEqual("hello", log.records['foo'][0].data)
+          self.assertEqual("hello", log.records[b'foo'][0].data.decode())
           yield tornado.gen.sleep(1.0)
 
           http = tornado.httpclient.AsyncHTTPClient()
           response = yield http.fetch('http://127.0.0.1:8223/connz')
-          result = json.loads(response.body)
+          result = json.loads(response.body.decode("utf-8"))
           connz = result['connections'][0]
           self.assertEqual(3, connz['subscriptions'])
           self.assertEqual(1, connz['in_msgs'])
@@ -716,7 +716,7 @@ class ClientAuthTest(tornado.testing.AsyncTestCase):
           yield component.nc.publish("foo", "world")
           yield tornado.gen.sleep(0.5)
           response = yield http.fetch('http://127.0.0.1:8223/connz')
-          result = json.loads(response.body)
+          result = json.loads(response.body.decode("utf-8"))
           connz = result['connections'][0]
           self.assertEqual(3, connz['subscriptions'])
           self.assertEqual(2, connz['in_msgs'])
@@ -812,7 +812,7 @@ class ClientAuthTest(tornado.testing.AsyncTestCase):
 
           http = tornado.httpclient.AsyncHTTPClient()
           response = yield http.fetch('http://127.0.0.1:8224/connz')
-          result = json.loads(response.body)
+          result = json.loads(response.body.decode("utf-8"))
           connz = result['connections'][0]
           self.assertEqual(c.max_messages - c.disconnected_at, connz['in_msgs'])
           self.assertTrue(c.pending_bytes_when_reconnected > c.pending_bytes_when_closed)
@@ -823,7 +823,7 @@ class ClientAuthTest(tornado.testing.AsyncTestCase):
           #
           # full_msg = ''
           # for msg in log.records['foo']:
-          #      full_msg += msg.data
+          #      full_msg += msg.data.decode()
           #
           # expected_full_msg = ''
           # for i in range(0, c.max_messages):
