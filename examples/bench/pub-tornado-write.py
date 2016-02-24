@@ -51,7 +51,7 @@ def go():
         for i in range(nc.max_messages):
             nc.total_written += 1
             nc.io.write("PUB help  {0}\r\n{1}\r\n".format(bytesize, line))
-    except Exception, e:
+    except Exception as e:
         pass
     finally:
         nc.end_time = time.time()

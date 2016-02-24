@@ -44,8 +44,8 @@ def go():
     try:
         for i in range(nc.max_messages):
             nc.total_written += 1
-            nc.socket.sendall("PUB help  {0}\r\n{1}\r\n".format(bytesize, line))
-    except socket.error, e:
+            nc.socket.sendall(b"PUB help  %b\r\n%b\r\n" % (bytesize, line))
+    except socket.error as e:
         if e.errno == 32:
             nc.broken_pipe_errors += 1
         elif e.errno == 11:

@@ -59,7 +59,7 @@ def go():
     # Confirm original stats in the server
     http = tornado.httpclient.AsyncHTTPClient()
     response = yield http.fetch('http://127.0.0.1:8225/varz')
-    start_varz = json.loads(response.body)
+    start_varz = json.loads(response.body.decode())
 
     nc.start_time = time.time()
     nc.max_messages = int(max_messages)
@@ -67,7 +67,7 @@ def go():
 
     for i in range(nc.max_messages):
         try:
-            result = yield nc.nc.timed_request("help", line)            
+            result = yield nc.nc.timed_request("help", line)
             nc.total_written += 1
         except tornado.gen.TimeoutError:
             nc.timeouts += 1
@@ -77,15 +77,15 @@ def go():
     except tornado.gen.TimeoutError:
         nc.timeouts += 1
 
-    nc.end_time = time.time()    
+    nc.end_time = time.time()
     duration = nc.end_time - nc.start_time
     rate = nc.total_written / duration
 
     http = tornado.httpclient.AsyncHTTPClient()
     response = yield http.fetch('http://127.0.0.1:8225/varz')
-    end_varz = json.loads(response.body)
+    end_varz = json.loads(response.body.decode())
     delta_varz_in_msgs = end_varz["in_msgs"] - start_varz["in_msgs"]
-    delta_varz_in_bytes = end_varz["in_bytes"] - start_varz["in_bytes"]    
+    delta_varz_in_bytes = end_varz["in_bytes"] - start_varz["in_bytes"]
 
     print("|{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}|".format(
         max_messages,

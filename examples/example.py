@@ -31,7 +31,7 @@ def main():
     # Request/Response
     def help_request_handler(msg):
         print("[Received]: %s" % msg.data)
-        nc.publish(msg.reply, "OK, I can help!")
+        nc.publish(msg.reply.decode(), "OK, I can help!")
 
     # Susbcription using distributed queue
     yield nc.subscribe("help", "workers", help_request_handler)
@@ -40,7 +40,7 @@ def main():
         # Expect a single request and timeout after 500 ms
         response = yield nc.timed_request("help", "Hi, need help!", 500)
         print("[Response]: %s" % response.data)
-    except tornado.gen.TimeoutError, e:
+    except tornado.gen.TimeoutError as e:
         print("Timeout! Need to retry...")
 
     # Customize number of responses to receive
@@ -62,7 +62,7 @@ def main():
         yield nc.flush(1000)
         end = datetime.now()
         print("Latency: %d µs" % (end.microsecond - start.microsecond))
-    except tornado.gen.TimeoutError, e:
+    except tornado.gen.TimeoutError as e:
         print("Timeout! Roundtrip too slow...")
 
 if __name__ == '__main__':
